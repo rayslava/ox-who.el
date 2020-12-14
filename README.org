@@ -1,0 +1,9 @@
+#+AUTHOR: Slava Brinov
+#+EMAIL: rayslava@gmail.com
+#+OPTIONS: toc:nil num:nil
+* Brief description
+  This exporter supports output from ~org-mode~ to ~with-html-output~.
+  The idea is to export blog posts easier
+* Acknowledgments
+  Thanks to Vilibald Wanča <vilibald@wvi.cz> and his [[https://github.com/w-vi/ox-wk.el][ox-wk]] for skeleton of this
+  file.
