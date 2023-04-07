@@ -1,0 +1,11 @@
+on: push
+name: Build
+jobs:
+  checks:
+    name: run
+    runs-on: ubuntu-latest
+    container: silex/emacs:28
+    steps:
+    - uses: actions/checkout@master
+    - name: Test
+      run: emacs -batch -L . -l ox-who-test.el -f ert-run-tests-batch
