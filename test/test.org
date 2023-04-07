@@ -3,3 +3,14 @@
 ** TODO Subsection                                                :tag1:tag2:
 *** TODO Subsubsection                                            :tag3:tag2:
     text tesyt
+* Section 2
+  A portion of *bold* text.
+
+  A portion of /italic/ text.
+* Section 3
+  With /*bold italic*/ text
+* Section 4 with *bold* header
+And a ~monospace text~
+#+BEGIN_SRC c
+int a;
+#+END_SRC

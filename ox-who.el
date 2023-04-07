@@ -1,7 +1,7 @@
 ;;; ox-who.el --- With-Html-Output Back-End for Org Export Engine  -*- lexical-binding: t; -*-
 
 
-;; Copyright (C) 2020 Viacheslav Barinov <rayslava@gmail.com>
+;; Copyright (C) 2020-2023 Viacheslav Barinov <rayslava@gmail.com>
 
 ;; Author: Viacheslav Barinov <rayslava@gmail.com>
 ;; Keywords: org, who
@@ -113,7 +113,7 @@ Use utf-8 as the default value."
   "Transcode BOLD object.
 CONTENTS is the text within bold markup.  INFO is a plist used as
 a communication channel."
-  (format "(:b \"%s\")" contents))
+  (format " (:b %s)" (string-trim contents)))
 
 ;;;; Underline
 
@@ -121,7 +121,7 @@ a communication channel."
   "Transcode UNDERLINE object.
 CONTENTS is the text within underline markup.  INFO is a plist used as
 a communication channel."
-  (format "(:u \"%s\"" contents))
+  (format " (:u %s)" contents))
 
 ;;;; Fixed width
 
@@ -129,7 +129,7 @@ a communication channel."
   "Transcode FIXED-WIDTH element.
 CONTENTS is nil.  INFO is a plist used as a communication
 channel."
-  (format "(:tt \"%s\"" contents))
+  (format " (:tt %s)" contents))
 
 ;;;; Code and Verbatim
 
@@ -139,9 +139,7 @@ CONTENTS is nil.  INFO is a plist used as a communication
 channel."
   (let ((value (org-element-property :value code))
         (lang (org-element-property :language code)))
-    (cond
-     ((eq ox-who-style 'creole) (ox-who--creole-nowiki code value info))
-     (t (concat "<code" (if lang (format " %s> " lang) "> ") (format "%s</code>" value))))))
+    (concat " (:code " (if lang (format ":lang \"%s\" " lang) "") (format "\"%s\")" (string-trim value)))))
 
 (defun ox-who-verbatim (verbatim contents info)
   "Transcode VERBATIM object.
@@ -149,7 +147,6 @@ CONTENTS is nil.  INFO is a plist used as a communication
 channel."
   (let ((value (org-element-property :value verbatim)))
     (cond
-     ((eq ox-who-style 'creole) (ox-who--creole-nowiki verbatim value info))
      ((eq ox-who-org-verbatim 'monospace)(ox-who-fixed-width verbatim contents info))
      (t (format "%%%% %s %%%%" value)))))
 
@@ -161,9 +158,7 @@ CONTENTS is nil.  INFO is a plist used as a communication
 channel."
   (let ((lang (org-element-property :language src-block))
         (content (org-export-format-code-default src-block info)))
-    (cond
-     ((eq ox-who-style 'creole) (ox-who--creole-nowiki src-block content info t))
-     (t (concat "<code" (if lang (format " %s>\n" lang) ">\n") (format "%s</code>" content))))))
+    (concat "(:code " (if lang (format ":lang \"%s\" " lang) "") (format "\"%s\")" (string-trim content)))))
 
 ;;;; Headline
 
@@ -218,7 +213,7 @@ INFO is a plist used as a communication channel."
   "Transcode ITALIC object.
 CONTENTS is the text within italic markup.  INFO is a plist used
 as a communication channel."
-  (format "(:i %s)" contents))
+  (format " (:i %s)" contents))
 
 ;;;; Item
 
@@ -347,7 +342,7 @@ INFO is a plist holding contextual information.  See `org-export-data'."
   "Transcode PARAGRAPH element.
 CONTENTS is the paragraph contents.  INFO is a plist used as
 a communication channel."
-  (format "(:p %s)" contents))
+  (format "(:p %s)" (string-trim contents)))
 
 ;;;; Plain List
 
