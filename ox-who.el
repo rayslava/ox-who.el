@@ -334,7 +334,7 @@ INFO is a plist holding contextual information.  See `org-export-data'."
                               (concat "file://" (expand-file-name raw-path))))
                            (t raw-path))))
                (if (not contents) (format "%s" path)
-                 (format "[[%s|%s]]" path contents)))))))
+                 (format " (:a :href \"%s\" %s)" path contents)))))))
 
 ;;;; Paragraph
 
