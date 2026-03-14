@@ -1,0 +1,5 @@
+#+OPTIONS: toc:nil num:nil
+* Links
+[[https://example.com][Example]]
+[[file:notes.org]]
+[[mailto:test@example.com][Mail]]

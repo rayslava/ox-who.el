@@ -1,7 +1,7 @@
 #+OPTIONS: toc:nil num:nil
 * Section
 ** TODO Subsection                                                :tag1:tag2:
-*** TODO Subsubsection                                            :tag3:tag2:
+*** TODO Subsubsection *bold*                                     :tag3:tag2:
     text tesyt
 * Section 2
   A portion of *bold* text.

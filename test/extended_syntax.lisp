@@ -1,0 +1,5 @@
+(:h1 "S")
+(:p (:s "strike") "H"(:sub "2")"O x"(:sup "2"))
+(:blockquote (:p "q"))
+(:pre :class "verse" "roses are red")
+(:div :style "text-align:center;" (:p "mid"))

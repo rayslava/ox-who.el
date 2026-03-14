@@ -1,0 +1,13 @@
+#+OPTIONS: toc:nil num:nil
+* S
++strike+ H_{2}O x^2
+#+begin_quote
+q
+#+end_quote
+#+begin_verse
+roses
+are red
+#+end_verse
+#+begin_center
+mid
+#+end_center

@@ -4,6 +4,12 @@
 * Brief description
   This exporter supports output from ~org-mode~ to ~with-html-output~.
   The idea is to export blog posts easier
+* Development
+  Run tests in batch mode with:
+  ~emacs -Q -batch -L . -l ox-who-test.el -f ert-run-tests-batch-and-exit~
+
+  Run tests plus coverage reporting with:
+  ~emacs -Q -batch -L . -l ox-who-test.el -f ox-who-batch-testcover-report~
 * Acknowledgments
   Thanks to Vilibald Wanča <vilibald@wvi.cz> and his [[https://github.com/w-vi/ox-wk.el][ox-wk]] for skeleton of this
   file.

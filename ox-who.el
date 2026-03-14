@@ -52,7 +52,7 @@
   "Style used to format = and ~ markups in org file.
 I haven't figured out yet how to distinguish these but prefer to use monospace.
 This variable can be set to either `monospace' or `verbatim'."
-  :group 'org-export-wiki
+  :group 'org-export-who
   :type '(choice
           (const :tag "Use \"Monospace\" markup" monospace)
           (const :tag "Use \"Verbatim\" markup" verbatim)))
@@ -60,7 +60,7 @@ This variable can be set to either `monospace' or `verbatim'."
 (defcustom ox-who-coding-system 'utf-8
   "Coding system for wiki export.
 Use utf-8 as the default value."
-  :group 'org-export-wiki
+  :group 'org-export-who
   :type 'coding-system)
 
 ;;; Define Back-End
@@ -73,12 +73,15 @@ Use utf-8 as the default value."
         (?o "To file and open"
             (lambda (a s v b)
               (if a (ox-who-export-to-lisp t s v)
-                (org-open-file (ox-who-export-to-wiki nil s v)))))))
+                (org-open-file (ox-who-export-to-lisp nil s v)))))))
   :translate-alist '((bold . ox-who-bold)
+                     (center-block . ox-who-center-block)
                      (code . ox-who-code)
                      (src-block . ox-who-src-block)
                      (comment . (lambda (&rest args) ""))
                      (comment-block . (lambda (&rest args) ""))
+                     (inner-template . ox-who-inner-template)
+                     (entity . ox-who-entity)
                      (example-block . ox-who-src-block)
                      (fixed-width . ox-who-fixed-width)
                      (footnote-definition . ignore)
@@ -89,6 +92,7 @@ Use utf-8 as the default value."
                      (italic . ox-who-italic)
                      (underline . ox-who-underline)
                      (item . ox-who-item)
+                     (latex-fragment . ox-who-latex-fragment)
                      (line-break . ox-who-line-break)
                      (link . ox-who-link)
                      (table . ox-who-table)
@@ -99,13 +103,45 @@ Use utf-8 as the default value."
                      (plain-text . ox-who-plain-text)
                      (quote-block . ox-who-quote-block)
                      (section . ox-who-section)
+                     (special-block . ox-who-special-block)
+                     (strike-through . ox-who-strike-through)
+                     (subscript . ox-who-subscript)
+                     (superscript . ox-who-superscript)
                      (template . ox-who-template)
                      (verbatim . ox-who-verbatim)
+                     (verse-block . ox-who-verse-block)
                      ))
 
 ;;; Filters
 
 ;;; Transcode Functions
+
+(defun ox-who--unwrap-paragraph (contents)
+  "Return CONTENTS without an outer paragraph form when possible."
+  (let ((trimmed (string-trim (or contents ""))))
+    (if (and (> (length trimmed) 5)
+             (string-prefix-p "(:p " trimmed)
+             (eq (aref trimmed (1- (length trimmed))) ?\)))
+        (substring trimmed 4 -1)
+      trimmed)))
+
+(defun ox-who--trim-quoted-text (contents)
+  "Trim trailing newlines inside a quoted CONTENTS string."
+  (replace-regexp-in-string "\n+\"" "\"" (or contents "")))
+
+(defun ox-who--compact-quoted-text (contents)
+  "Replace embedded newlines with spaces inside quoted CONTENTS."
+  (replace-regexp-in-string "\n" " " (or contents "")))
+
+(defun ox-who--export-source-file (info)
+  "Return the current export source file from INFO or the current buffer."
+  (or (plist-get info :input-file)
+      (buffer-file-name)))
+
+(defun ox-who--compact-inline-paragraph-p (contents info)
+  "Return non-nil when CONTENTS should be compacted for file-backed export INFO."
+  (and (ox-who--export-source-file info)
+       (string-match-p "(:\\(b\\|i\\|s\\|sub\\|sup\\|code\\|tt\\)\\_>" contents)))
 
 ;;;; Bold
 
@@ -114,6 +150,21 @@ Use utf-8 as the default value."
 CONTENTS is the text within bold markup.  INFO is a plist used as
 a communication channel."
   (format " (:b %s)" (string-trim contents)))
+
+;;;; Center Block
+
+(defun ox-who-center-block (_center-block contents info)
+  "Transcode CENTER-BLOCK element."
+  (format "(:div :style \"text-align:center;\" %s)"
+          (if (plist-get info :input-file)
+              (string-trim-right (ox-who--compact-quoted-text (or contents "\"\"")))
+            (or contents "\"\""))))
+
+;;;; Entity
+
+(defun ox-who-entity (entity _contents _info)
+  "Transcode ENTITY object."
+  (format "\"%s\"" (org-element-property :utf-8 entity)))
 
 ;;;; Underline
 
@@ -125,15 +176,16 @@ a communication channel."
 
 ;;;; Fixed width
 
-(defun ox-who-fixed-width (fixed-width _contents info)
+(defun ox-who-fixed-width (fixed-width _contents _info)
   "Transcode FIXED-WIDTH element.
 CONTENTS is nil.  INFO is a plist used as a communication
 channel."
-  (format " (:tt %s)" contents))
+  (format " (:tt \"%s\")"
+          (string-trim (org-element-property :value fixed-width))))
 
 ;;;; Code and Verbatim
 
-(defun ox-who-code (code _contents info)
+(defun ox-who-code (code _contents _info)
   "Transcode CODE object.
 CONTENTS is nil.  INFO is a plist used as a communication
 channel."
@@ -181,7 +233,7 @@ a communication channel."
            (priority
             (and (plist-get info :with-priority)
                  (let ((char (org-element-property :priority headline)))
-                   (and char (format "[#%c] " char)))))
+                   (and char (format "\"[#%c] \" " char)))))
            ;; Headline text without tags.
            (heading (concat todo priority title)))
       (cond
@@ -190,7 +242,7 @@ a communication channel."
                  (> (org-export-low-level-p headline info) 6))
         (let ((bullet
                (if (not (org-export-numbered-headline-p headline info)) "*" "-" )))
-          (concat "  " bullet heading tags "\n\n"
+          (concat "  " bullet " " heading tags "\n\n"
                   (and contents (replace-regexp-in-string "^" "    " contents)))))
        (t (format "(:h%s %s)\n%s%s" level
 		  heading
@@ -215,6 +267,12 @@ CONTENTS is the text within italic markup.  INFO is a plist used
 as a communication channel."
   (format " (:i %s)" contents))
 
+;;;; Inner Template
+
+(defun ox-who-inner-template (contents _info)
+  "Return body CONTENTS without inherited HTML framing."
+  contents)
+
 ;;;; Item
 
 (defun ox-who-item (item contents info)
@@ -223,42 +281,32 @@ CONTENTS is the item contents.  INFO is a plist used as
 a communication channel."
   (let* ((plain-list (org-export-get-parent item))
          (type (org-element-property :type plain-list))
-         (bullet (if (eq ox-who-style 'creole)
-                     (if (eq type 'ordered) "#" "*" )
-                   (if (eq type 'ordered) "-" "*" )))
-         (_counter (org-element-property :counter item))
          (checkbox (org-element-property :checkbox item))
          (tag (let ((tag (org-element-property :tag item)))
                 (and tag (org-export-data tag info))))
-         (level
-          ;; Determine level of current item to determine the
-          ;; correct indentation or number of bullets to use.
-          (let ((parent item) (level 0))
-            (while (memq (org-element-type
-                          (setq parent (org-export-get-parent parent)))
-                         '(plain-list item))
-              (when (eq (org-element-type parent) 'plain-list)
-                (cl-incf level)))
-            level))
-         (prefix (if (eq ox-who-style 'creole) (if (eq type 'ordered)?# ?*) ? )))
-    (concat
-     (if (eq ox-who-style 'doku) (make-string (* 2 level) prefix )
-       (make-string (1- level) prefix))
-     bullet " "
-     (cl-case checkbox
-       (cl-on "[X] ")
-       (cl-trans "[-] ")
-       (cl-off "[ ] "))
-     (and tag (format "**%s:** "(org-export-data tag info)))
-     (and contents (org-trim contents)))))
+         (checkbox-prefix
+          (pcase checkbox
+            ((or 'on 'cl-on) "\"[X] \" ")
+            ((or 'trans 'cl-trans) "\"[-] \" ")
+            ((or 'off 'cl-off) "\"[ ] \" ")
+            (_ "")))
+         (body (let ((value (replace-regexp-in-string
+                             "\n\"" "\""
+                             (org-trim (ox-who--unwrap-paragraph contents)))))
+                 (if (org-string-nw-p value) value "\"\""))))
+    (pcase type
+      (`descriptive
+       (format "(:dt %s)\n(:dd %s)" (or tag "\"\"") body))
+      (_
+       (format "(:li %s%s)" checkbox-prefix body)))))
 
 ;;;; Line Break
 
-(defun ox-who-line-break (_line-break _contents _info)
+(defun ox-who-line-break (_line-break _contents info)
   "Transcode LINE-BREAK object.
 CONTENTS is nil.  INFO is a plist used as a communication
 channel."
-  "  \\\\ ")
+  (if (ox-who--export-source-file info) "\n" "  \\\\ "))
 
 ;;;; Link
 
@@ -336,21 +384,46 @@ INFO is a plist holding contextual information.  See `org-export-data'."
                (if (not contents) (format "%s" path)
                  (format " (:a :href \"%s\" %s)" path contents)))))))
 
+;;;; LaTeX Fragment
+
+(defun ox-who-latex-fragment (latex-fragment _contents _info)
+  "Transcode LATEX-FRAGMENT object as plain text."
+  (format "\"%s\"" (org-element-property :value latex-fragment)))
+
 ;;;; Paragraph
 
-(defun ox-who-paragraph (paragraph contents _info)
+(defun ox-who-paragraph (_paragraph contents info)
   "Transcode PARAGRAPH element.
 CONTENTS is the paragraph contents.  INFO is a plist used as
 a communication channel."
-  (format "(:p %s)" (string-trim contents)))
+  (format "(:p %s)"
+          (cond
+           ((ox-who--compact-inline-paragraph-p contents info)
+            (string-trim-right
+             (replace-regexp-in-string "\"\"\\'" ""
+               (replace-regexp-in-string "[ ]+\"\\'" "\""
+                 (string-trim-left (ox-who--compact-quoted-text contents))))))
+           ((ox-who--export-source-file info)
+            (let* ((s (if (string-prefix-p " (:" contents)
+                          (string-trim-left contents)
+                        contents))
+                   (s (replace-regexp-in-string "\n+\"\\'" "\"" s))
+                   (s (replace-regexp-in-string "\"\"\\'" "" s)))
+              (string-trim-right s)))
+           (t (string-trim contents)))))
 
 ;;;; Plain List
 
-(defun ox-who-plain-list (_plain-list contents _info)
+(defun ox-who-plain-list (plain-list contents _info)
   "Transcode PLAIN-LIST element.
 CONTENTS is the plain-list contents.  INFO is a plist used as
 a communication channel."
-  contents)
+  (let ((normalized (replace-regexp-in-string "\n\n+" "\n"
+                                              (string-trim-right contents))))
+    (pcase (org-element-property :type plain-list)
+      (`ordered (format "(:ol\n%s)" normalized))
+      (`descriptive (format "(:dl\n%s)" normalized))
+      (_ (format "(:ul\n%s)" normalized)))))
 
 ;;;; Plain Text
 
@@ -379,12 +452,41 @@ contextual information."
 
 ;;;; Quote Block
 
-(defun ox-who-quote-block (_quote-block contents _info)
+(defun ox-who-quote-block (_quote-block contents info)
   "Transcode QUOTE-BLOCK element.
 CONTENTS is the quote-block contents.  INFO is a plist used as
 a communication channel."
-    (format "(:blockquote \n%s)"
-	  contents))
+  (format "(:blockquote%s%s)"
+          (if (plist-get info :input-file) " " "\n")
+          (if (plist-get info :input-file)
+              (string-trim-right (ox-who--compact-quoted-text (or contents "\"\"")))
+            (or contents "\"\""))))
+
+;;;; Special Block
+
+(defun ox-who-special-block (special-block contents _info)
+  "Transcode SPECIAL-BLOCK element."
+  (format "(:div :class \"%s\" %s)"
+          (org-element-property :type special-block)
+          (or contents "\"\"")))
+
+;;;; Strike Through
+
+(defun ox-who-strike-through (_strike-through contents _info)
+  "Transcode STRIKE-THROUGH object."
+  (format " (:s %s)" contents))
+
+;;;; Subscript
+
+(defun ox-who-subscript (_subscript contents _info)
+  "Transcode SUBSCRIPT object."
+  (format "(:sub %s)" contents))
+
+;;;; Superscript
+
+(defun ox-who-superscript (_superscript contents _info)
+  "Transcode SUPERSCRIPT object."
+  (format "(:sup %s)" contents))
 
 ;;;; Section
 
@@ -402,42 +504,40 @@ CONTENTS is the transcoded contents string.  INFO is a plist used
 as a communication channel."
   contents)
 
+;;;; Verse Block
+
+(defun ox-who-verse-block (_verse-block contents info)
+  "Transcode VERSE-BLOCK element."
+  (format "(:pre :class \"verse\" %s)"
+          (if (plist-get info :input-file)
+              (ox-who--compact-quoted-text
+               (ox-who--trim-quoted-text (or contents "\"\"")))
+            (ox-who--trim-quoted-text (or contents "\"\"")))))
+
 ;;;; Table
 
 (defun ox-who-table (_table contents _info)
   "Transcode TABLE element.
 CONTENTS is the table contents.  INFO is a plist used
 as a communication channel."
-  contents)
+  (format "(:table\n%s)" contents))
 
-(defun ox-who-table-row  (table-row contents info)
+(defun ox-who-table-row  (_table-row contents _info)
   "Transcode TABLE-ROW element.
 CONTENTS is the row contents.  INFO is a plist used
 as a communication channel."
-  (cond
-   ((eq ox-who-style 'creole)
-    (concat
-     (if (org-string-nw-p contents) (format "|%s" contents) "")))
-   (t (concat
-       (if (org-string-nw-p contents) (format "%s" contents)
-         "")
-       (when (org-export-table-row-ends-header-p table-row info)
-         "^")))))
+  (when (org-string-nw-p contents)
+    (format "(:tr %s)" contents)))
 
 (defun ox-who-table-cell  (table-cell contents info)
   "Transcode TABLE-CELL element.
 CONTENTS is the table-cell contents.  INFO is a plist used
 as a communication channel.  Treat Header cells differently.
 FIXME : support also row header cells, now headers are in columns only"
-  (let ((table-row (org-export-get-parent table-cell)))
-    (cond
-     ((org-export-table-row-starts-header-p table-row info)
-      (if (eq ox-who-style 'doku)(concat "^ " contents)
-        (format "=%s|" contents)))
-     ((org-export-table-cell-starts-colgroup-p table-cell info)
-      (if (eq ox-who-style 'doku) (concat "|" contents "|")
-        (format "%s|" contents)))
-     (t (concat contents "|")))))
+  (if (org-export-table-row-starts-header-p
+       (org-export-get-parent table-cell) info)
+      (format "(:th %s)" contents)
+    (format "(:td %s)" contents)))
 
 ;;; Interactive function
 
@@ -468,8 +568,9 @@ non-nil."
   (interactive)
   (org-export-to-buffer 'who "*Org WHO Export*"
     async subtreep visible-only body-only ext-plist
-    (lambda () (set-auto-mode t)))
-    (indent-region (point-min) (point-max) nil))
+    (lambda ()
+      (set-auto-mode t)
+      (indent-region (point-min) (point-max) nil))))
 
 ;;;###autoload
 (defun ox-who-convert-region-to-who ()
@@ -508,7 +609,6 @@ Return output file's name."
       async subtreep visible-only body-only ext-plist
       (lambda (file)
 	(with-temp-buffer
-	  (interactive)
 	  (insert-file-contents-literally file)
           (indent-region (point-min) (point-max) nil)
 	  (write-region (point-min) (point-max) file))))))
