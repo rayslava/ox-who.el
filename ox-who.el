@@ -1,14 +1,12 @@
 ;;; ox-who.el --- With-Html-Output Back-End for Org Export Engine  -*- lexical-binding: t; -*-
 
-
-;; Copyright (C) 2020-2023 Viacheslav Barinov <rayslava@gmail.com>
+;; Copyright (C) 2020-2026 Viacheslav Barinov <rayslava@gmail.com>
 
 ;; Author: Viacheslav Barinov <rayslava@gmail.com>
-;; Keywords: org, who
+;; Keywords: org, who, docs
 ;; URL: https://github.com/rayslava/ox-who.el
-;; Package-Requires: ((emacs "24.4") (org "8.3"))
-;; Keywords: Org, who, docs
-;; Version: 0.1
+;; Package-Requires: ((emacs "27.1") (org "9.3"))
+;; Version: 0.1.0
 
 ;; This file is not part of GNU Emacs.
 
@@ -36,7 +34,8 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
+(require 'cl-lib)
+(require 'subr-x)
 (require 'ox-html)
 
 ;;; User-Configurable Variables
@@ -45,8 +44,8 @@
   "Options specific to WHO export back-end."
   :tag "Org Export WHO"
   :group 'org-export
-  :version "24.3"
-  :package-version '(Org . "8.3"))
+  :version "27.1"
+  :package-version '(ox-who . "0.1.0"))
 
 (defcustom ox-who-org-verbatim 'monospace
   "Style used to format = and ~ markups in org file.
@@ -138,6 +137,12 @@ Use utf-8 as the default value."
   (or (plist-get info :input-file)
       (buffer-file-name)))
 
+(defun ox-who--escape-string (s)
+  "Escape S for embedding as a WHO Lisp string literal content.
+Escapes backslashes and double quotes so the result is valid inside \"...\"."
+  (replace-regexp-in-string "\"" "\\\\\""
+    (replace-regexp-in-string "\\\\" "\\\\\\\\" s)))
+
 (defun ox-who--compact-inline-paragraph-p (contents info)
   "Return non-nil when CONTENTS should be compacted for file-backed export INFO."
   (and (ox-who--export-source-file info)
@@ -181,7 +186,7 @@ a communication channel."
 CONTENTS is nil.  INFO is a plist used as a communication
 channel."
   (format " (:tt \"%s\")"
-          (string-trim (org-element-property :value fixed-width))))
+          (ox-who--escape-string (string-trim (org-element-property :value fixed-width)))))
 
 ;;;; Code and Verbatim
 
@@ -191,7 +196,7 @@ CONTENTS is nil.  INFO is a plist used as a communication
 channel."
   (let ((value (org-element-property :value code))
         (lang (org-element-property :language code)))
-    (concat " (:code " (if lang (format ":lang \"%s\" " lang) "") (format "\"%s\")" (string-trim value)))))
+    (concat " (:code " (if lang (format ":lang \"%s\" " lang) "") (format "\"%s\")" (ox-who--escape-string (string-trim value))))))
 
 (defun ox-who-verbatim (verbatim contents info)
   "Transcode VERBATIM object.
@@ -210,7 +215,7 @@ CONTENTS is nil.  INFO is a plist used as a communication
 channel."
   (let ((lang (org-element-property :language src-block))
         (content (org-export-format-code-default src-block info)))
-    (concat "(:code " (if lang (format ":lang \"%s\" " lang) "") (format "\"%s\")" (string-trim content)))))
+    (concat "(:pre (:code " (if lang (format ":lang \"%s\" " lang) "") (format "\"%s\"))" (ox-who--escape-string (string-trim content))))))
 
 ;;;; Headline
 
@@ -381,7 +386,9 @@ INFO is a plist holding contextual information.  See `org-export-data'."
                             (if (not (file-name-absolute-p raw-path)) raw-path
                               (concat "file://" (expand-file-name raw-path))))
                            (t raw-path))))
-               (if (not contents) (format "%s" path)
+               (if (not contents)
+                   (format " (:a :href \"%s\" \"%s\")"
+                           path (ox-who--escape-string path))
                  (format " (:a :href \"%s\" %s)" path contents)))))))
 
 ;;;; LaTeX Fragment
@@ -407,7 +414,8 @@ a communication channel."
             (let* ((s (if (string-prefix-p " (:" contents)
                           (string-trim-left contents)
                         contents))
-                   (s (replace-regexp-in-string "\n+\"\\'" "\"" s))
+                   (s (replace-regexp-in-string "\n" " " s))
+                   (s (replace-regexp-in-string "[ ]+\"\\'" "\"" s))
                    (s (replace-regexp-in-string "\"\"\\'" "" s)))
               (string-trim-right s)))
            (t (string-trim contents)))))
@@ -441,6 +449,8 @@ contextual information."
   (setq text (replace-regexp-in-string "\\(!\\)\\[" "\\\\!" text nil nil 1))
   ;; Protect `, *, _ and \
   (setq text (replace-regexp-in-string "[`*_\\]" "\\\\\\&" text))
+  ;; Protect double quotes (must follow backslash escaping above)
+  (setq text (replace-regexp-in-string "\"" "\\\\\"" text))
   ;; Handle special strings, if required.
   (when (plist-get info :with-special-strings)
     (setq text (org-html-convert-special-strings text)))
